@@ -326,7 +326,7 @@ public class DnsClient {
 		int sectionSize = 0; //domain names are split up into sections (seperated by numbers, but represent "." in the domain outline)
 
 		while(responseCopy[indexOffset + count] != 0){
-			if(sectionSize == 0){ //the first section
+			if(sectionSize == 0){ //the first section or starting a new section 
 				if (count != 0){ //it is not the start of the alias 
 				aliasName += "."; //replace the number witsh a period as done in qname 
 				}
@@ -381,7 +381,8 @@ public class DnsClient {
 		int ttl = ttlWrapped.getInt();
 	
 		short rdLengthResponse = twoBytesToShort(response[indexResponse + 10], response[indexResponse + 11]);
-			if(responseType == QueryType.OTHER){
+			
+		if(responseType == QueryType.OTHER){
 				return rdLengthResponse;
 			}
 			if (responseType == QueryType.A) { // rdata is the IP Address
