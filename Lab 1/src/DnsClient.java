@@ -143,9 +143,9 @@ public class DnsClient {
 		if (type == QueryType.A) {
 			question.put((byte) 0x0001); // A type query
 		} else if (type == QueryType.MX) {
-			question.put((byte) 0x0002); // Mail server query
+			question.put((byte) 0x000f); // Mail server query
 		} else {
-			question.put((byte) 0x000f); // Name server query
+			question.put((byte) 0x0002); // Name server query
 		}
 
 		// QCLASS
@@ -242,7 +242,7 @@ public class DnsClient {
 		System.out.println(
 				"Response received after " + ((endingTime - startingTime) / 1000.0 + " seconds (" + i + " retries)"));
 
-		int indexResponse = sendPacket.getLength(); // response answer starts at end of header, get index
+		int indexResponse = sendPacket.getLength(); // response answer starts at end of header, get index, 32 bits 
 		
 		System.out.println("*** Answer Section (" + ANCOUNT + " records) ***");
 		
@@ -295,10 +295,8 @@ public class DnsClient {
 			throw new RuntimeException(
 					"ERROR\tServer failure: the name server was unable to process this query due to a problem with the name server");
 
-		case 3: // fix this it should be NOTFOUND? //TO DO 
-			throw new RuntimeException(
-					"ERROR\tName error: meaningful only for responses from an authoritative name server, this code signifies that the domain name referenced in the query does not exist");
-
+		case 3: 
+			throw new RuntimeException("NOTFOUND");
 		case 4:
 			throw new RuntimeException("ERROR\tNot implemented: the name server does not support the requested kind of query");
 
@@ -313,7 +311,7 @@ public class DnsClient {
 			throw new RuntimeException("Error\tPacket received is not a response.");
 		}
 		if(RA != 1){
-			throw new RuntimeException("Error\tServer does not support recursive queries"); //TO DO CAUSE WE STILL PRINT OUT THE ANSWERS?
+			System.out.println("Error\tServer does not support recursive queries"); 
 		}
 		if (AA == 1) { // else it stays false and is not authoritative
 			return true;
@@ -321,26 +319,26 @@ public class DnsClient {
 		return false;
 	}
 
-	public static String parseAliasName(DatagramPacket response, int indexOffset){ //TO DOOOOO
+	public static String parseAliasName(DatagramPacket response, int indexOffset){ //parse the alias name, and account for packet compression and pointers within the response 
 		String aliasName = "";
 		byte[] responseCopy = response.getData();
 		int count = 0; 
-		int sectionNum = 0; 
+		int sectionSize = 0; //domain names are split up into sections (seperated by numbers, but represent "." in the domain outline)
 
 		while(responseCopy[indexOffset + count] != 0){
-			if(sectionNum == 0){
+			if(sectionSize == 0){ //the first section
 				if (count != 0){ //it is not the start of the alias 
-				aliasName += "."; //replace the number with a period as done in qname 
+				aliasName += "."; //replace the number witsh a period as done in qname 
 				}
-			sectionNum = responseCopy[indexOffset + count];
+			sectionSize = responseCopy[indexOffset + count]; //gets the size of the section we are about to parse 
 			}
-			else if((sectionNum & 0xC0) == 0xC0){ //it is a pointer to the replicated part within the answer
-				indexOffset = ((sectionNum & 0x0000003f) << 8) + (responseCopy[indexOffset + count] & 0xff );
-				sectionNum = responseCopy[indexOffset];
+			else if((sectionSize & 0xC0) == 0xC0){ //indicates that the next byte is a pointer, the next byte will be the offset value
+				indexOffset = ((sectionSize & 0x0000003f) << 8) + (responseCopy[indexOffset + count] & 0xff); //reset the index offset to zero, and then get the offset value from the beginning of the header 
+				sectionSize = responseCopy[indexOffset]; //now at correct position that pointer was indicating 
 				count = 0;
 			} else { //it is a character within a section 
 				aliasName += (char)responseCopy[indexOffset + count];
-				sectionNum--;
+				sectionSize--;
 			}
 			count++;
 		}
@@ -352,7 +350,7 @@ public class DnsClient {
 		byte[] response = receivePacket.getData();
 
 		short typeResponseShort = twoBytesToShort(response[indexResponse + 2], response[indexResponse + 3]);
-		QueryType responseType = QueryType.A;
+		QueryType responseType = QueryType.A; //default 
 
 		if (typeResponseShort == (short) 0x0001) {
 			responseType = QueryType.A;
@@ -362,11 +360,12 @@ public class DnsClient {
 		} 
 		else if (typeResponseShort == (short) 0x0002) {
 			responseType = QueryType.NS;
-
-		} else if (typeResponseShort == (short) 0x000f) {
+		} 
+		else if (typeResponseShort == (short) 0x000f) {
 			responseType = QueryType.MX;
 		} else { 
-			throw new RuntimeException("Error\tQuery type of response unknown.");
+			System.out.println("ERROR\tQuery type of response unknown.");
+			responseType = QueryType.OTHER;
 		}
 		
 		short classResponse = twoBytesToShort(response[indexResponse + 4], response[indexResponse + 5]);
@@ -382,7 +381,9 @@ public class DnsClient {
 		int ttl = ttlWrapped.getInt();
 	
 		short rdLengthResponse = twoBytesToShort(response[indexResponse + 10], response[indexResponse + 11]);
-
+			if(responseType == QueryType.OTHER){
+				return rdLengthResponse;
+			}
 			if (responseType == QueryType.A) { // rdata is the IP Address
 
 				int domainIP_1 = response[indexResponse + 12] & 0xff;
@@ -402,7 +403,7 @@ public class DnsClient {
 	}
 
 	public static int NSRecordsSize(DatagramPacket receivePacket, int indexResponse){
-		//the size of the rddata field is held at the 10th byte from the end of the header 
+		//the size of the rddata field is held at the 10th byte from the end of the header, will return the size of the Authority Record 
 		byte[] response = receivePacket.getData();
 		short rdLengthResponse = twoBytesToShort(response[indexResponse + 10], response[indexResponse + 11]);
 		
