@@ -46,8 +46,8 @@ public class DnsClient {
 				try {
 					timeoutVal = Integer.parseInt(args[i + 1]);
 				} catch (Exception e) {
-					throw new IllegalArgumentException(
-							"ERROR\tIncorrect input syntax: Timeout value is not an integer, please retry");
+					System.out.println("ERROR\tIncorrect input syntax: Timeout value is not an integer, please retry");
+					System.exit(1);
 				}
 			}
 
@@ -55,8 +55,8 @@ public class DnsClient {
 				try {
 					maxRetries = Integer.parseInt(args[i + 1]);
 				} catch (Exception e) {
-					throw new IllegalArgumentException(
-							"ERROR\tIncorrect input syntax: Max retries is not an integer, please retry");
+					System.out.println("ERROR\tIncorrect input syntax: Max retries is not an integer, please retry");
+					System.exit(1);
 				}
 			}
 
@@ -64,8 +64,8 @@ public class DnsClient {
 				try {
 					portNumber = Integer.parseInt(args[i + 1]);
 				} catch (Exception e) {
-					throw new IllegalArgumentException(
-							"ERROR\tIncorrect input syntax: Port number is not an integer, please retry.");
+					System.out.println("ERROR\tIncorrect input syntax: Port number is not an integer, please retry.");
+					System.exit(1);
 				}
 			}
 
@@ -86,8 +86,8 @@ public class DnsClient {
 		// byte array for parsed server name
 		byte[] ipAddr = new byte[4];
 		if (!server.substring(0, 1).equals("@")) {
-			throw new IllegalArgumentException(
-					"ERROR\tIncorrect input syntax: Incorrect syntax for server IP Address.");
+			System.out.println("ERROR\tIncorrect input syntax 1: Incorrect syntax for server IP Address.");
+					System.exit(1);
 		}
 		server = server.substring(1);
 		String[] ipAddrStr = server.split("\\.", 4);
@@ -95,16 +95,22 @@ public class DnsClient {
 
 		for (k = 0; k < ipAddrStr.length; k++) {
 			try {
+
+				int number = Integer.parseInt(ipAddrStr[k]);
+				if(number > 255 || number < 0){
+					System.out.println("ERROR\tIncorrect input syntax 2: Incorrect syntax for server IP Address.");
+					System.exit(1);
+				}
 				ipAddr[k] = (byte) Integer.parseInt(ipAddrStr[k]);
 			} catch (Exception e) {
-				throw new IllegalArgumentException(
-						"ERROR\tIncorrect input syntax: Incorrect syntax for server IP Address.");
+				System.out.println("ERROR\tIncorrect input syntax 3: Incorrect syntax for server IP Address.");
+					System.exit(1);
 			}
 		}
 
 		if (k != 4) {
-			throw new IllegalArgumentException(
-					"ERROR\tIncorrect input syntac: Incorrect syntax for server IP Address.");
+			System.out.println("ERROR\tIncorrect input syntax: Incorrect syntax for server IP Address.");
+					System.exit(1);
 		}
 
 		String[] sectionsOfName = name.split("\\."); // this gets the total different amount parts of the name seperated by "."
@@ -194,11 +200,13 @@ public class DnsClient {
 		clientSocket.close(); //close the socket 
 		
 		if (maxRetries == i) {
-			throw new RuntimeException("ERROR\tMaximum number of retries " + maxRetries + " exceeded");
+			System.out.println("ERROR\tMaximum number of retries " + maxRetries + " exceeded");
+			System.exit(1);
 		}
 		//i dont think this is needed??? TO DO 
 		if (receivePacket == null) {
-			throw new Exception("NOTFOUND");
+			System.out.println("NOTFOUND");
+			System.exit(1);
 		}
 
 		byte[] response = receivePacket.getData();
@@ -216,18 +224,6 @@ public class DnsClient {
 		ANCOUNT = twoBytesToShort(response[6], response[7]); //ANCOUNT 2 bytes
 		NSCOUNT = twoBytesToShort(response[8], response[9]); //NSCOUNT 2 bytes
 		ARCOUNT = twoBytesToShort(response[10], response[11]); //ARCOUNT 2 bytes 
-
-		// debug
-		// System.out.println("Response QR is: " + QR);
-		// System.out.println("Response AA is: " + AA);
-		// System.out.println("Response TC is: " + TC);
-		// System.out.println("Response RD is: " + RD);
-		// System.out.println("Response RA is: " + RA);
-		// System.out.println("Response RCODE is: " + RCODE);
-		// System.out.println("Response QDCOUNT is: " + QDCOUNT);
-		// System.out.println("Response ANCOUNT is: " + ANCOUNT);
-		// System.out.println("Response NSCOUNT is: " + NSCOUNT);
-		// System.out.println("Response ARCOUNT is: " + ARCOUNT);
 
 		authoritative = checkResponseHeaderValues(QR, AA, RA); // check QR, AA values
 		
@@ -288,27 +284,30 @@ public class DnsClient {
 			break;
 
 		case 1:
-			throw new RuntimeException(
-				"ERROR\tFormat error: the name server was unable to interpret the query");
+			System.out.println("ERROR\tFormat error: the name server was unable to interpret the query");
+			System.exit(1);
 
 		case 2:
-			throw new RuntimeException(
-					"ERROR\tServer failure: the name server was unable to process this query due to a problem with the name server");
+			System.out.println("ERROR\tServer failure: the name server was unable to process this query due to a problem with the name server");
+			System.exit(1);
 
 		case 3: 
-			throw new RuntimeException("NOTFOUND");
+			System.out.println("NOTFOUND");
+
 		case 4:
-			throw new RuntimeException("ERROR\tNot implemented: the name server does not support the requested kind of query");
+			System.out.println("ERROR\tNot implemented: the name server does not support the requested kind of query");
+			System.exit(1);
 
 		case 5:
-			throw new RuntimeException(
-					"ERROR\tRefused: the name server refuses to perform the requested operation for policy reasons");
+			System.out.println("ERROR\tRefused: the name server refuses to perform the requested operation for policy reasons");
+			System.exit(1);
 		}
 	}
 
 	public static boolean checkResponseHeaderValues(int QR, int AA, int RA) {
 		if (QR != 1) {
-			throw new RuntimeException("Error\tPacket received is not a response.");
+			System.out.println("Error\tPacket received is not a response.");
+			System.exit(1);
 		}
 		if(RA != 1){
 			System.out.println("Error\tServer does not support recursive queries"); 
@@ -319,16 +318,15 @@ public class DnsClient {
 		return false;
 	}
 
-	public static String parseAliasName(DatagramPacket response, int indexOffset){ //parse the alias name, and account for packet compression and pointers within the response 
+	public static String parseAliasName(DatagramPacket response, int indexOffset, int count){ //parse the alias name, and account for packet compression and pointers within the response 
 		String aliasName = "";
 		byte[] responseCopy = response.getData();
-		int count = 0; 
 		int sectionSize = 0; //domain names are split up into sections (seperated by numbers, but represent "." in the domain outline)
 
 		while(responseCopy[indexOffset + count] != 0){
 			if(sectionSize == 0){ //the first section or starting a new section 
 				if (count != 0){ //it is not the start of the alias 
-				aliasName += "."; //replace the number witsh a period as done in qname 
+					aliasName += "."; //replace the number with a period as done in qname 
 				}
 			sectionSize = responseCopy[indexOffset + count]; //gets the size of the section we are about to parse 
 			}
@@ -371,7 +369,8 @@ public class DnsClient {
 		short classResponse = twoBytesToShort(response[indexResponse + 4], response[indexResponse + 5]);
 
 		if (classResponse != (short)0x0001) {
-			throw new RuntimeException("ERROR\tThe class number is not equal to 1.");
+			System.out.println("ERROR\tThe class number is not equal to 1.");
+			System.exit(1);
 		}
 
 		// ttl 32 bit
@@ -393,12 +392,12 @@ public class DnsClient {
 				int domainIP_4 = response[indexResponse + 15] & 0xff;
 				System.out.println("IP\t" + domainIP_1 + "." + domainIP_2 + "." + domainIP_3 + "." + domainIP_4 + "	\t" + ttl + "\t" + auth_name);
 			} else if (responseType == QueryType.NS) { // the name of the server with the same format as qname
-				System.out.println("NS\t" + parseAliasName(receivePacket, indexResponse + 12) + "\t" + ttl + "\t" + auth_name);
+				System.out.println("NS\t" + parseAliasName(receivePacket, indexResponse + 12, 0) + "\t" + ttl + "\t" + auth_name);
 			} else if (responseType == QueryType.CNAME) {
-				System.out.println("CNAME\t" + parseAliasName(receivePacket, indexResponse + 12) + "\t" + ttl + "\t" + auth_name);
+				System.out.println("CNAME\t" + parseAliasName(receivePacket, indexResponse + 12, 0) + "\t" + ttl + "\t" + auth_name);
 			} else { 
 				short preference = twoBytesToShort(response[indexResponse + 12], response[indexResponse + 13]);
-				System.out.println("MX\t" + parseAliasName(receivePacket, indexResponse + 14) + "\t" + preference + "\t" + ttl + "\t" + auth_name);
+				System.out.println("MX\t" + parseAliasName(receivePacket, indexResponse + 14, 0) + "\t" + preference + "\t" + ttl + "\t" + auth_name);
 			}		
 			return rdLengthResponse;
 	}
